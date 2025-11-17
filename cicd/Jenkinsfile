@@ -119,7 +119,7 @@ set -e
 
 systemctl daemon-reload
 systemctl enable ${params.SERVICE_NAME}
-systemctl restart ${params.SERVICE_NAME}
+systemctl start ${params.SERVICE_NAME}
 
 exit 0
 EOF
