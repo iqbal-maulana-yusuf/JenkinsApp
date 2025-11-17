@@ -3,6 +3,7 @@ pipeline{
     
     parameters {
         string(name: 'APP_NAME', defaultValue: 'JenkinsApp', description: 'Application package name')
+        string(name: 'APP_PUBLISH_NAME', defaultValue: 'debain13', description: 'Application publish name')
         string(name: 'SERVICE_NAME', defaultValue: 'JenkinsApp', description: 'Systemd service name')
         string(name: 'VERSION', defaultValue: '1.0.0', description: 'Package version')
         string(name: 'RUNTIME', defaultValue: 'linux-x64', description: 'Runtime identifier')
@@ -10,6 +11,7 @@ pipeline{
     }
     
     environment {
+        APP_DIR = "JenkinsApp"
         BUILD_DIR = "build"
         PUBLISH_DIR = "publish"
         DEB_DIR = "deb"
@@ -42,7 +44,7 @@ pipeline{
                     -c Release \
                     -r ${params.RUNTIME} \
                     --self-contained true \
-                    -o debain13
+                    -o ${params.APP_PUBLISH_NAME}
                 """
             }
         }
@@ -58,7 +60,7 @@ pipeline{
 
                 // Copy published app
                 sh """
-                cp ${PUBLISH_DIR}/${params.APP_NAME} ${DEB_DIR}/opt/${params.APP_NAME}/
+                cp -r ${APP_DIR}/${params.APP_PUBLISH_NAME} ${DEB_DIR}/opt/${params.APP_NAME}/
                 """
 
                 // Generate DEBIAN/control
