@@ -116,8 +116,8 @@ EOF
                  
                 cd ${params.APT_REPO_PATH}
                  
-                echo $SUDO_PASS | sudo -S dpkg-scanpackages . /dev/null | gzip -9c > Packages.gz
-                echo $SUDO_PASS | sudo -S dpkg-scanpackages . /dev/null > Packages
+                echo $SUDO_PASS | sudo -S dpkg-scanpackages . /dev/null | gzip -9c | sudo tee Packages.gz > /dev/null
+                echo $SUDO_PASS | sudo -S dpkg-scanpackages . /dev/null | sudo tee Packages > /dev/null
                 """
             }
         }
