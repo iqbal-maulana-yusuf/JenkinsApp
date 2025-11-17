@@ -193,6 +193,7 @@ EOF
             steps {
                 sh """
                 sudo apt update
+                sudo apt remove jenkinsapp -y
                 sudo apt install jenkinsapp -y
                 """
             }
