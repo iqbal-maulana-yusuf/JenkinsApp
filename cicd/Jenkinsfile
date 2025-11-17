@@ -83,7 +83,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/opt/${params.APP_NAME}/${params.APP_NAME}
+ExecStart=/opt/${params.APP_NAME}/${params.APP_PUBLISH_NAME}/${params.APP_NAME}
 Restart=always
 RestartSec=5
 User=root
