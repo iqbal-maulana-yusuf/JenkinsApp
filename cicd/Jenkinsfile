@@ -6,7 +6,9 @@ pipeline{
     stages{
         stage("Build"){
             steps{
-                echo("Hello Pipeline")
+                echo("Hello Pipeline 1")
+                echo("Hello Pipeline 2")
+                echo("Hello Pipeline 3")
             }
         }
         stage("Test"){
