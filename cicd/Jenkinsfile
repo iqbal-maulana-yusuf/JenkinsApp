@@ -27,6 +27,7 @@ pipeline{
         }
         failure{
             echo "Running failure"
+            sh "error"
         }
         cleanup{
             echo "cleanup file"
