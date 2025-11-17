@@ -13,6 +13,7 @@ pipeline {
     environment {
         APP_DIR = "JenkinsApp"
         DEB_DIR = "deb"
+        SUDO_PASS = credentials('sudo_pass')
     }
 
     triggers {
@@ -110,11 +111,13 @@ EOF
         stage('Update Local APT Repository') {
             steps {
                 sh """
-                    mkdir -p ${params.APT_REPO_PATH}
-                    cp ${params.APP_NAME}_${params.VERSION}.deb ${params.APT_REPO_PATH}/
-                    cd ${params.APT_REPO_PATH}
-                    dpkg-scanpackages . /dev/null | gzip -9c > Packages.gz
-                    dpkg-scanpackages . /dev/null > Packages
+                echo $SUDO_PASS | sudo -S mkdir -p ${params.APT_REPO_PATH}
+                echo $SUDO_PASS | sudo -S cp ${params.APP_NAME}_${params.VERSION}.deb ${params.APT_REPO_PATH}/
+                 
+                cd ${params.APT_REPO_PATH}
+                 
+                echo $SUDO_PASS | sudo -S dpkg-scanpackages . /dev/null | gzip -9c > Packages.gz
+                echo $SUDO_PASS | sudo -S dpkg-scanpackages . /dev/null > Packages
                 """
             }
         }
