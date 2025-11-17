@@ -193,7 +193,7 @@ EOF
             steps {
                 sh """
                 sudo apt update
-                sudo apt install ${params.APP_NAME} -y
+                sudo apt install jenkinsapp -y
                 """
             }
         }
