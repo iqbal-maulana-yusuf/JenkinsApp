@@ -1,24 +1,48 @@
 pipeline{
     agent any
+    
+    parameters {
+        string(name: 'APP_NAME', defaultValue: 'JenkinsApp', description: 'Application package name')
+        string(name: 'SERVICE_NAME', defaultValue: 'JenkinsApp', description: 'Systemd service name')
+        string(name: 'VERSION', defaultValue: '1.0.0', description: 'Package version')
+        string(name: 'RUNTIME', defaultValue: 'linux-x64', description: 'Runtime identifier')
+        string(name: 'APT_REPO_PATH', defaultValue: '/usr/local/share/myrepo', description: 'Local APT repo directory')
+    }
+    
+    environment {
+        BUILD_DIR = "build"
+        PUBLISH_DIR = "publish"
+        DEB_DIR = "deb"
+    }
+    
+    
     triggers{
         pollSCM("*/1 * * * *")
         }
+        
+        
     stages{
-        stage("Build"){
-            steps{
-                echo("Hello Pipeline 1")
-                echo("Hello Pipeline 2")
-                echo("Hello Pipeline 3")
+        stage('Restore') {
+            steps {
+                sh 'dotnet restore'
             }
         }
-        stage("Test"){
-            steps{
-                echo("Hello Test")
+
+        stage('Build') {
+            steps {
+                sh 'dotnet build -c Release --no-restore'
             }
         }
-        stage("Deploy"){
-            steps{
-                echo("Hello Diploy")
+        
+        stage('Publish - Self Contained') {
+            steps {
+                sh """
+                dotnet publish -c Release -r ${params.RUNTIME} \
+                    --self-contained true \
+                    -p:PublishSingleFile=true \
+                    --no-build --no-restore \
+                    -o ${PUBLISH_DIR}
+                """
             }
         }
     }
