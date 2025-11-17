@@ -2,8 +2,7 @@ pipeline {
     agent any
 
     parameters {
-        string(name: 'APP_NAME', defaultValue: 'JenkinsApp', description: 'Application package name')
-        string(name: 'APP_PUBLISH_NAME', defaultValue: 'debian13', description: 'Application publish name')
+        string(name: 'APP_NAME', defaultValue: 'JenkinsApp', description: 'Application name')
         string(name: 'SERVICE_NAME', defaultValue: 'JenkinsApp', description: 'Systemd service name')
         string(name: 'VERSION', defaultValue: '1.0.0', description: 'Package version')
         string(name: 'RUNTIME', defaultValue: 'linux-x64', description: 'Runtime identifier')
@@ -11,57 +10,49 @@ pipeline {
     }
 
     environment {
-        APP_DIR = "JenkinsApp"
-        DEB_DIR = "deb"
         SUDO_PASS = credentials('sudo_pass')
-    }
-
-    triggers {
-        pollSCM("*/1 * * * *")
+        DEB_DIR = "deb"
+        PUBLISH_DIR = "publish"
     }
 
     stages {
 
         stage('Restore') {
-            steps {
-                sh "dotnet restore"
-            }
+            steps { sh "dotnet restore" }
         }
 
         stage('Build') {
-            steps {
-                sh "dotnet build -c Release"
-            }
+            steps { sh "dotnet build -c Release" }
         }
 
-        stage('Publish - Self Contained') {
+        stage('Publish') {
             steps {
                 sh """
-                cd ${APP_DIR}
+                rm -rf ${PUBLISH_DIR}
                 dotnet publish \
                     -c Release \
                     -r ${params.RUNTIME} \
                     --self-contained true \
-                    -o ${params.APP_PUBLISH_NAME}
+                    -o ${PUBLISH_DIR}
                 """
             }
         }
 
-        stage('Prepare Debian Package Structure') {
+        stage('Prepare Debian Structure') {
             steps {
-
                 sh """
                 rm -rf ${DEB_DIR}
+
                 mkdir -p ${DEB_DIR}/DEBIAN
                 mkdir -p ${DEB_DIR}/opt/${params.APP_NAME}
                 mkdir -p ${DEB_DIR}/etc/systemd/system
-                """
 
-                sh """
-                cp -r ${APP_DIR}/${params.APP_PUBLISH_NAME} ${DEB_DIR}/opt/${params.APP_NAME}/
+                cp -r ${PUBLISH_DIR}/* ${DEB_DIR}/opt/${params.APP_NAME}/
                 """
+            }
 
-                /* control file */
+            // CONTROL FILE
+            steps {
                 sh """
 cat <<EOF > ${DEB_DIR}/DEBIAN/control
 Package: ${params.APP_NAME}
@@ -69,12 +60,14 @@ Version: ${params.VERSION}
 Section: base
 Priority: optional
 Architecture: amd64
-Maintainer: CI/CD Pipeline
-Description: ${params.APP_NAME} Web API Service
+Maintainer: CI System
+Description: ${params.APP_NAME} ASP.NET Web API
 EOF
                 """
+            }
 
-                /* systemd service file */
+            // SYSTEMD SERVICE
+            steps {
                 sh """
 cat <<EOF > ${DEB_DIR}/etc/systemd/system/${params.SERVICE_NAME}.service
 [Unit]
@@ -84,117 +77,83 @@ After=network.target
 [Service]
 Type=simple
 ExecStart=/opt/${params.APP_NAME}/${params.APP_NAME}
+WorkingDirectory=/opt/${params.APP_NAME}
 Restart=always
 RestartSec=5
-User=root
 Environment=DOTNET_ENVIRONMENT=Production
 
 [Install]
 WantedBy=multi-user.target
 EOF
                 """
+            }
 
-                /* ========== MAINTAINER SCRIPTS ========== */
-
-                // PREINST
+            // Maintainer Scripts
+            steps {
                 sh """
 cat << 'EOF' > ${DEB_DIR}/DEBIAN/preinst
 #!/bin/bash
 set -e
-
-# If service exists, stop before upgrading
-if systemctl list-unit-files | grep -q "${params.SERVICE_NAME}.service"; then
-    systemctl stop ${params.SERVICE_NAME} || true
-fi
-
+systemctl stop ${params.SERVICE_NAME} 2>/dev/null || true
 exit 0
 EOF
-                """
 
-                // POSTINST
-                sh """
 cat << 'EOF' > ${DEB_DIR}/DEBIAN/postinst
 #!/bin/bash
 set -e
-
+chmod +x /opt/${params.APP_NAME}/${params.APP_NAME}
 systemctl daemon-reload
 systemctl enable ${params.SERVICE_NAME}
 systemctl restart ${params.SERVICE_NAME}
-
 exit 0
 EOF
-                """
 
-                // PRERM
-                sh """
 cat << 'EOF' > ${DEB_DIR}/DEBIAN/prerm
 #!/bin/bash
 set -e
-
-# Stop service before removal
-if systemctl is-active --quiet ${params.SERVICE_NAME}; then
-    systemctl stop ${params.SERVICE_NAME}
-fi
-
+systemctl stop ${params.SERVICE_NAME} 2>/dev/null || true
 exit 0
 EOF
-                """
 
-                // POSTRM
-                sh """
 cat << 'EOF' > ${DEB_DIR}/DEBIAN/postrm
 #!/bin/bash
 set -e
-
 systemctl daemon-reload
-
 exit 0
 EOF
-                """
 
-                /* Make scripts executable */
-                sh "chmod 755 ${DEB_DIR}/DEBIAN/preinst ${DEB_DIR}/DEBIAN/postinst ${DEB_DIR}/DEBIAN/prerm ${DEB_DIR}/DEBIAN/postrm"
+chmod 755 ${DEB_DIR}/DEBIAN/*
+                """
             }
         }
 
         stage('Build .deb Package') {
             steps {
+                sh "dpkg-deb --build ${DEB_DIR} ${params.APP_NAME}_${params.VERSION}.deb"
+            }
+        }
+
+        stage('Update Local APT Repo') {
+            steps {
                 sh """
-                dpkg-deb --build ${DEB_DIR} ${params.APP_NAME}_${params.VERSION}.deb
+echo $SUDO_PASS | sudo -S mkdir -p ${params.APT_REPO_PATH}
+echo $SUDO_PASS | sudo -S cp ${params.APP_NAME}_${params.VERSION}.deb ${params.APT_REPO_PATH}/
+
+cd ${params.APT_REPO_PATH}
+
+sudo dpkg-scanpackages . > Packages
+gzip -fk Packages
                 """
             }
         }
-        
-        stage('Update Local APT Repository') {
-            steps {
-                sh """
-                echo $SUDO_PASS | sudo -S mkdir -p ${params.APT_REPO_PATH}
-                echo $SUDO_PASS | sudo -S cp ${params.APP_NAME}_${params.VERSION}.deb ${params.APT_REPO_PATH}/
-                 
-                cd ${params.APT_REPO_PATH}
-                 
-                echo $SUDO_PASS | sudo -S dpkg-scanpackages . /dev/null | gzip -9c | sudo tee Packages.gz > /dev/null
-                echo $SUDO_PASS | sudo -S dpkg-scanpackages . /dev/null | sudo tee Packages > /dev/null
-                """
-            }
-        }
-        
-        stage('Deploy - Install Package') {
-            steps {
-                sh """
-                sudo apt update
-                sudo apt install ${params.APP_NAME} -y
-                """
-            }
+
+        stage('Install From Repo') {
+            steps { sh "sudo apt update && sudo apt install -y ${params.APP_NAME}" }
         }
     }
 
     post {
-        success {
-            echo "Running success"
-        }
-        failure {
-            echo "Running failure"
-        }
+        success { echo "Pipeline success!" }
+        failure { echo "Pipeline failed!" }
     }
 }
