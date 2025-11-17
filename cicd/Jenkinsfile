@@ -110,13 +110,11 @@ EOF
         stage('Update Local APT Repository') {
             steps {
                 sh """
-                sudo mkdir -p ${params.APT_REPO_PATH}
-                sudo cp ${params.APP_NAME}_${params.VERSION}.deb ${params.APT_REPO_PATH}/
-
-                cd ${params.APT_REPO_PATH}
-
-                sudo dpkg-scanpackages . /dev/null | gzip -9c > Packages.gz
-                sudo dpkg-scanpackages . /dev/null > Packages
+                    mkdir -p ${params.APT_REPO_PATH}
+                    cp ${params.APP_NAME}_${params.VERSION}.deb ${params.APT_REPO_PATH}/
+                    cd ${params.APT_REPO_PATH}
+                    dpkg-scanpackages . /dev/null | gzip -9c > Packages.gz
+                    dpkg-scanpackages . /dev/null > Packages
                 """
             }
         }
