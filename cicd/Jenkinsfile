@@ -98,6 +98,14 @@ pipeline{
                 """
             }
         }
+        
+        stage('Build .deb Package') {
+            steps {
+                sh """
+                dpkg-deb --build ${DEB_DIR} ${params.APP_NAME}_${params.VERSION}.deb
+                """
+            }
+        }
     }
     
     post{
