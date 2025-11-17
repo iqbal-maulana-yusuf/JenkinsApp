@@ -30,7 +30,7 @@ pipeline{
 
         stage('Build') {
             steps {
-                sh 'dotnet build -c Release --no-restore'
+                sh 'dotnet build -c Release'
             }
         }
         
@@ -42,7 +42,6 @@ pipeline{
                     -c Release \
                     -r ${params.RUNTIME} \
                     --self-contained true \
-                    --no-build --no-restore \
                     -o debain13
                 """
             }
