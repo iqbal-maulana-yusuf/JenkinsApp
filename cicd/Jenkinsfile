@@ -1,45 +1,42 @@
-pipeline{
+pipeline {
     agent any
-    
+
     parameters {
         string(name: 'APP_NAME', defaultValue: 'JenkinsApp', description: 'Application package name')
-        string(name: 'APP_PUBLISH_NAME', defaultValue: 'debain13', description: 'Application publish name')
+        string(name: 'APP_PUBLISH_NAME', defaultValue: 'debian13', description: 'Application publish name')
         string(name: 'SERVICE_NAME', defaultValue: 'JenkinsApp', description: 'Systemd service name')
         string(name: 'VERSION', defaultValue: '1.0.0', description: 'Package version')
         string(name: 'RUNTIME', defaultValue: 'linux-x64', description: 'Runtime identifier')
         string(name: 'APT_REPO_PATH', defaultValue: '/usr/local/share/myrepo', description: 'Local APT repo directory')
     }
-    
+
     environment {
         APP_DIR = "JenkinsApp"
-        BUILD_DIR = "build"
-        PUBLISH_DIR = "publish"
         DEB_DIR = "deb"
     }
-    
-    
-    triggers{
-        pollSCM("*/1 * * * *")
-        }
-        
-        
-    stages{
+
+    triggers {
+        pollSCM("*/1 * * * *")   // poll setiap 1 menit
+    }
+
+    stages {
+
         stage('Restore') {
             steps {
-                sh 'dotnet restore'
+                sh "dotnet restore"
             }
         }
 
         stage('Build') {
             steps {
-                sh 'dotnet build -c Release'
+                sh "dotnet build -c Release"
             }
         }
-        
+
         stage('Publish - Self Contained') {
             steps {
                 sh """
-                cd JenkinsApp
+                cd ${APP_DIR}
                 dotnet publish \
                     -c Release \
                     -r ${params.RUNTIME} \
@@ -48,9 +45,10 @@ pipeline{
                 """
             }
         }
-        
+
         stage('Prepare Debian Package Structure') {
             steps {
+
                 sh """
                 rm -rf ${DEB_DIR}
                 mkdir -p ${DEB_DIR}/DEBIAN
@@ -58,13 +56,14 @@ pipeline{
                 mkdir -p ${DEB_DIR}/etc/systemd/system
                 """
 
-                // Copy published app
                 sh """
                 cp -r ${APP_DIR}/${params.APP_PUBLISH_NAME} ${DEB_DIR}/opt/${params.APP_NAME}/
                 """
 
-// Generate DEBIAN/control
-sh """
+                /* =============================
+                   Generate DEBIAN/control file
+                   ============================= */
+                sh """
 cat <<EOF > ${DEB_DIR}/DEBIAN/control
 Package: ${params.APP_NAME}
 Version: ${params.VERSION}
@@ -74,12 +73,13 @@ Architecture: amd64
 Maintainer: CI/CD Pipeline
 Description: ${params.APP_NAME} Web API Service
 EOF
-"""
-        
-// Generate systemd service file
-sh """
-cat <<EOF > ${DEB_DIR}/etc/systemd/system/${params.SERVICE_NAME}.service
+                """
 
+                /* =======================================
+                   Generate systemd service file
+                   ======================================= */
+                sh """
+cat <<EOF > ${DEB_DIR}/etc/systemd/system/${params.SERVICE_NAME}.service
 [Unit]
 Description=${params.APP_NAME} Web API
 After=network.target
@@ -95,10 +95,10 @@ Environment=DOTNET_ENVIRONMENT=Production
 [Install]
 WantedBy=multi-user.target
 EOF
-"""
+                """
             }
         }
-        
+
         stage('Build .deb Package') {
             steps {
                 sh """
@@ -107,22 +107,19 @@ EOF
             }
         }
     }
-    
-    post{
-        always{
+
+    post {
+        always {
             echo "Running"
         }
-        success{
+        success {
             echo "Running success"
         }
-        failure{
+        failure {
             echo "Running failure"
-
         }
-        cleanup{
+        cleanup {
             echo "cleanup file"
         }
-        
-        
     }
 }
