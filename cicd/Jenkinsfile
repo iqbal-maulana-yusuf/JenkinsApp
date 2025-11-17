@@ -7,4 +7,21 @@ pipeline{
             }
         }
     }
+    
+    post{
+        always{
+            echo "Running"
+        }
+        success{
+            echo "Running success"
+        }
+        failure{
+            echo "Running failure"
+        }
+        cleanup{
+            echo "cleanup file"
+        }
+        
+        
+    }
 }
