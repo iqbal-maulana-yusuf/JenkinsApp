@@ -46,6 +46,56 @@ pipeline{
                 """
             }
         }
+        
+        stage('Prepare Debian Package Structure') {
+            steps {
+                sh """
+                rm -rf ${DEB_DIR}
+                mkdir -p ${DEB_DIR}/DEBIAN
+                mkdir -p ${DEB_DIR}/opt/${params.APP_NAME}
+                mkdir -p ${DEB_DIR}/etc/systemd/system
+                """
+
+                // Copy published app
+                sh """
+                cp ${PUBLISH_DIR}/${params.APP_NAME} ${DEB_DIR}/opt/${params.APP_NAME}/
+                """
+
+                // Generate DEBIAN/control
+                sh """
+                cat <<EOF > ${DEB_DIR}/DEBIAN/control
+                Package: ${params.APP_NAME}
+                Version: ${params.VERSION}
+                Section: base
+                Priority: optional
+                Architecture: amd64
+                Maintainer: CI/CD Pipeline
+                Description: ${params.APP_NAME} Web API Service
+                EOF
+                 """
+        
+                // Generate systemd service file
+                sh """
+                cat <<EOF > ${DEB_DIR}/etc/systemd/system/${params.SERVICE_NAME}.service
+                
+                [Unit]
+                Description=${params.APP_NAME} Web API
+                After=network.target
+                
+                [Service]
+                Type=simple
+                ExecStart=/opt/${params.APP_NAME}/${params.APP_NAME}
+                Restart=always
+                RestartSec=5
+                User=root
+                Environment=DOTNET_ENVIRONMENT=Production
+                
+                [Install]
+                WantedBy=multi-user.target
+                EOF
+                """
+            }
+        }
     }
     
     post{
