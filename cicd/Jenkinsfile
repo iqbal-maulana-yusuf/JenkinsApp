@@ -38,12 +38,12 @@ pipeline{
             steps {
                 sh """
                 cd JenkinsApp
-                dotnet publish JenkinsApp.csproj \
+                dotnet publish \
                     -c Release \
                     -r ${params.RUNTIME} \
                     --self-contained true \
                     --no-build --no-restore \
-                    -o ../${PUBLISH_DIR}
+                    -o debain13
                 """
             }
         }
