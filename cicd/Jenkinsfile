@@ -17,7 +17,7 @@ pipeline {
     }
 
     triggers {
-        pollSCM("*/1 * * * *")   // poll setiap 1 menit
+        pollSCM("*/1 * * * *")
     }
 
     stages {
@@ -61,9 +61,7 @@ pipeline {
                 cp -r ${APP_DIR}/${params.APP_PUBLISH_NAME} ${DEB_DIR}/opt/${params.APP_NAME}/
                 """
 
-                /* =============================
-                   Generate DEBIAN/control file
-                   ============================= */
+                /* control file */
                 sh """
 cat <<EOF > ${DEB_DIR}/DEBIAN/control
 Package: ${params.APP_NAME}
@@ -76,9 +74,7 @@ Description: ${params.APP_NAME} Web API Service
 EOF
                 """
 
-                /* =======================================
-                   Generate systemd service file
-                   ======================================= */
+                /* systemd service file */
                 sh """
 cat <<EOF > ${DEB_DIR}/etc/systemd/system/${params.SERVICE_NAME}.service
 [Unit]
@@ -97,6 +93,67 @@ Environment=DOTNET_ENVIRONMENT=Production
 WantedBy=multi-user.target
 EOF
                 """
+
+                /* ========== MAINTAINER SCRIPTS ========== */
+
+                // PREINST
+                sh """
+cat << 'EOF' > ${DEB_DIR}/DEBIAN/preinst
+#!/bin/bash
+set -e
+
+# If service exists, stop before upgrading
+if systemctl list-unit-files | grep -q "${params.SERVICE_NAME}.service"; then
+    systemctl stop ${params.SERVICE_NAME} || true
+fi
+
+exit 0
+EOF
+                """
+
+                // POSTINST
+                sh """
+cat << 'EOF' > ${DEB_DIR}/DEBIAN/postinst
+#!/bin/bash
+set -e
+
+systemctl daemon-reload
+systemctl enable ${params.SERVICE_NAME}
+systemctl restart ${params.SERVICE_NAME}
+
+exit 0
+EOF
+                """
+
+                // PRERM
+                sh """
+cat << 'EOF' > ${DEB_DIR}/DEBIAN/prerm
+#!/bin/bash
+set -e
+
+# Stop service before removal
+if systemctl is-active --quiet ${params.SERVICE_NAME}; then
+    systemctl stop ${params.SERVICE_NAME}
+fi
+
+exit 0
+EOF
+                """
+
+                // POSTRM
+                sh """
+cat << 'EOF' > ${DEB_DIR}/DEBIAN/postrm
+#!/bin/bash
+set -e
+
+systemctl daemon-reload
+
+exit 0
+EOF
+                """
+
+                /* Make scripts executable */
+                sh "chmod 755 ${DEB_DIR}/DEBIAN/preinst ${DEB_DIR}/DEBIAN/postinst ${DEB_DIR}/DEBIAN/prerm ${DEB_DIR}/DEBIAN/postrm"
             }
         }
 
@@ -121,20 +178,23 @@ EOF
                 """
             }
         }
+        
+        stage('Deploy - Install Package') {
+            steps {
+                sh """
+                sudo apt update
+                sudo apt install ${params.APP_NAME} -y
+                """
+            }
+        }
     }
 
     post {
-        always {
-            echo "Running"
-        }
         success {
             echo "Running success"
         }
         failure {
             echo "Running failure"
-        }
-        cleanup {
-            echo "cleanup file"
         }
     }
 }
