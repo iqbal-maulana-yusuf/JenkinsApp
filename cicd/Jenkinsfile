@@ -37,11 +37,13 @@ pipeline{
         stage('Publish - Self Contained') {
             steps {
                 sh """
-                dotnet publish -c Release -r ${params.RUNTIME} \
+                cd JenkinsApp
+                dotnet publish JenkinsApp.csproj \
+                    -c Release \
+                    -r ${params.RUNTIME} \
                     --self-contained true \
-                    -p:PublishSingleFile=true \
                     --no-build --no-restore \
-                    -o ${PUBLISH_DIR}
+                    -o ../${PUBLISH_DIR}
                 """
             }
         }
